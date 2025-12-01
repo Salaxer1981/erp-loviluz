@@ -23,8 +23,8 @@ export default function LoginPage({ onLoginSuccess }) {
 
       if (response.ok) {
         localStorage.setItem("token", data.access_token);
-        // Guardamos el token en localStorage
-        localStorage.setItem("userEmail", email);
+        localStorage.setItem("userEmail", data.email);
+        localStorage.setItem("userRole", data.role); // <--- GUARDAMOS EL ROL
 
         onLoginSuccess();
       } else {
