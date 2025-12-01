@@ -18,23 +18,21 @@ import {
   Zap,
   FileText,
   Users,
-  ArrowUpRight,
+  Sparkles,
+  Shield,
 } from "lucide-react";
 
-// Datos simulados para el gráfico de barras (hasta que tengamos histórico real)
 const dataBarras = [
   { name: "Lun", altas: 4 },
   { name: "Mar", altas: 3 },
   { name: "Mié", altas: 2 },
   { name: "Jue", altas: 6 },
-  { name: "Vie", altas: 8 }, // Digamos que hoy es viernes y hubo movimiento
+  { name: "Vie", altas: 8 },
 ];
 
-// Colores estilo Power BI
-const COLORS = ["#3b82f6", "#e2e8f0"]; // Azul eléctrico y Gris suave
+const COLORS = ["#3b82f6", "#e2e8f0"];
 
-export default function DashboardHome({ stats }) {
-  // Estado para la Lista de Tareas (Frontend temporal)
+export default function DashboardHome({ stats, setActiveModule }) {
   const [tasks, setTasks] = useState([
     { id: 1, text: "Revisar facturas pendientes de Iberdrola", done: false },
     { id: 2, text: "Llamar al cliente Juan Pérez (Urgente)", done: true },
@@ -45,15 +43,69 @@ export default function DashboardHome({ stats }) {
     setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   };
 
-  // Datos para el gráfico circular (Power BI Style)
   const dataCircular = [
-    { name: "Activos", value: stats.activos || 1 }, // Evitar 0 para que no se rompa el gráfico
+    { name: "Activos", value: stats.activos || 1 },
     { name: "Bajas", value: stats.inactivos || 0 },
   ];
 
+  const userRole = localStorage.getItem("userRole") || "comercial";
+
+  // DEFINICIÓN DE BOTONES CON EL NUEVO COLOR ROJO PARA FACTURAS
+  const quickActions = [
+    {
+      label: "CRM",
+      module: "CRM",
+      icon: Users,
+      color: "text-blue-400",
+      bg: "group-hover:bg-blue-500/20",
+      border: "group-hover:border-blue-500/50",
+      roles: ["admin", "comercial", "backoffice"],
+    },
+    {
+      label: "Energía",
+      module: "Energía",
+      icon: Zap,
+      color: "text-yellow-400",
+      bg: "group-hover:bg-yellow-500/20",
+      border: "group-hover:border-yellow-500/50",
+      roles: ["admin", "comercial", "backoffice"],
+    },
+    {
+      label: "Facturas",
+      module: "Facturación",
+      icon: FileText,
+      color: "text-red-400", // ROJO LOVILUZ
+      bg: "group-hover:bg-red-500/20",
+      border: "group-hover:border-red-500/50",
+      roles: ["admin", "contabilidad", "backoffice"],
+    },
+    {
+      label: "Asistente IA",
+      module: "Asistente",
+      icon: Sparkles,
+      color: "text-pink-400",
+      bg: "group-hover:bg-pink-500/20",
+      border: "group-hover:border-pink-500/50",
+      roles: ["admin", "comercial", "backoffice"],
+    },
+    {
+      label: "Gobernanza",
+      module: "Gobernanza",
+      icon: Shield,
+      color: "text-green-400",
+      bg: "group-hover:bg-green-500/20",
+      border: "group-hover:border-green-500/50",
+      roles: ["admin"],
+    },
+  ];
+
+  const allowedActions = quickActions.filter((action) =>
+    action.roles.includes(userRole)
+  );
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* 1. SECCIÓN DE TARJETAS SUPERIORES (KPIs) */}
+      {/* 1. KPIs (CON ROJO EN FACTURAS) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KpiCard
           title="Ingresos Totales"
@@ -83,13 +135,13 @@ export default function DashboardHome({ stats }) {
           title="Facturas Emitidas"
           value={stats.total_facturas}
           icon={FileText}
-          color="text-purple-600"
-          bg="bg-purple-50"
+          color="text-red-600"
+          bg="bg-red-50"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 2. POWER BI WIDGET (Círculo) */}
+        {/* 2. POWER BI WIDGET */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -124,26 +176,23 @@ export default function DashboardHome({ stats }) {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            {/* Texto Central del Donut */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-3xl font-bold text-slate-800">
                 {stats.activos}
               </span>
-              <span className="text-xs text-slate-400 uppercase">Activos</span>
+              <span className="text-xs text-slate-400 uppercase">
+                Activos : {stats.total_clientes}
+              </span>
             </div>
           </div>
-          <p className="text-center text-xs text-slate-400 mt-2">
-            Distribución de Cartera
-          </p>
         </div>
 
-        {/* 3. GRÁFICO DE BARRAS (Estadísticas de Altas) */}
+        {/* 3. GRÁFICO BARRAS */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-800">Rendimiento Semanal</h3>
             <select className="text-xs border-none bg-slate-50 rounded-md p-1 text-slate-500 outline-none">
               <option>Últimos 7 días</option>
-              <option>Este mes</option>
             </select>
           </div>
           <div className="h-[200px] w-full">
@@ -185,9 +234,8 @@ export default function DashboardHome({ stats }) {
         </div>
       </div>
 
-      {/* 4. LISTA DE TAREAS & ACCESOS RÁPIDOS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tareas */}
+        {/* 4. TAREAS */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800">Lista de Tareas</h3>
@@ -200,12 +248,11 @@ export default function DashboardHome({ stats }) {
               <div key={task.id} className="flex items-start gap-3 group">
                 <button
                   onClick={() => toggleTask(task.id)}
-                  className={`mt-0.5 min-w-[18px] h-[18px] rounded border flex items-center justify-center transition-colors
-                    ${
-                      task.done
-                        ? "bg-blue-600 border-blue-600 text-white"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
+                  className={`mt-0.5 min-w-[18px] h-[18px] rounded border flex items-center justify-center transition-colors ${
+                    task.done
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : "border-slate-300 hover:border-blue-400"
+                  }`}
                 >
                   {task.done && <CheckSquare size={12} />}
                 </button>
@@ -216,63 +263,71 @@ export default function DashboardHome({ stats }) {
                 >
                   {task.text}
                 </span>
-                <button className="ml-auto opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-500">
-                  <MoreHorizontal size={16} />
-                </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Módulos (Accesos Rápidos) */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-xl shadow-lg text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="relative z-10">
-            <h3 className="font-bold text-lg mb-1">Acceso Rápido</h3>
-            <p className="text-slate-400 text-sm mb-6">
-              Gestiona tus módulos principales
-            </p>
+        {/* 5. CENTRO DE MANDO (DISEÑO RADIAL CON ROJO LOVILUZ) */}
+        <div className="relative p-8 rounded-3xl overflow-hidden bg-slate-950 text-white flex flex-col items-center justify-center shadow-2xl border border-slate-800 min-h-[400px]">
+          {/* Fondo Radial con tonos Rojos */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black opacity-80"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-500/10 rounded-full blur-3xl animate-pulse"></div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button className="bg-white/10 hover:bg-white/20 p-3 rounded-lg text-left transition-colors group">
-                <Users
-                  className="mb-2 text-blue-400 group-hover:scale-110 transition-transform"
-                  size={20}
-                />
-                <span className="text-xs font-bold">CRM</span>
-              </button>
-              <button className="bg-white/10 hover:bg-white/20 p-3 rounded-lg text-left transition-colors group">
-                <Zap
-                  className="mb-2 text-yellow-400 group-hover:scale-110 transition-transform"
-                  size={20}
-                />
-                <span className="text-xs font-bold">Energía</span>
-              </button>
-              <button className="bg-white/10 hover:bg-white/20 p-3 rounded-lg text-left transition-colors group">
-                <FileText
-                  className="mb-2 text-purple-400 group-hover:scale-110 transition-transform"
-                  size={20}
-                />
-                <span className="text-xs font-bold">Facturas</span>
-              </button>
-              <button className="bg-white/10 hover:bg-white/20 p-3 rounded-lg text-left transition-colors group">
-                <ArrowUpRight
-                  className="mb-2 text-green-400 group-hover:scale-110 transition-transform"
-                  size={20}
-                />
-                <span className="text-xs font-bold">Reportes</span>
-              </button>
+          {/* NÚCLEO CENTRAL ILUMINADO */}
+          <div className="relative z-20 flex flex-col items-center mb-8 text-center">
+            <div className="p-4 rounded-full bg-yellow-500/10 border border-yellow-400/50 shadow-[0_0_30px_rgba(234,179,8,0.4)] backdrop-blur-md mb-3 animate-[pulse_3s_infinite]">
+              <Zap
+                size={32}
+                className="text-yellow-300 fill-yellow-300 drop-shadow-[0_0_10px_rgba(253,224,71,0.9)]"
+              />
             </div>
+            <h3 className="font-bold text-2xl tracking-tight">
+              Centro de Mando
+            </h3>
+            <p className="text-slate-400 text-xs">
+              Sistema Operativo Energético
+            </p>
           </div>
 
-          {/* Decoración de fondo */}
-          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
+          {/* GRID RADIAL DE BOTONES */}
+          <div className="relative z-10 flex flex-wrap justify-center gap-4 max-w-lg">
+            {allowedActions.map((action) => (
+              <button
+                key={action.label}
+                onClick={() => setActiveModule(action.module)}
+                className={`
+                    group relative flex flex-col items-center justify-center w-28 h-28 rounded-2xl transition-all duration-300
+                    bg-white/5 border border-white/10 hover:scale-105 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]
+                    backdrop-blur-sm
+                    ${action.border}
+                  `}
+              >
+                <div
+                  className={`p-2 rounded-full mb-2 bg-slate-900/50 ${action.color} group-hover:scale-110 transition-transform`}
+                >
+                  <action.icon size={28} />
+                </div>
+                <span className="text-xs font-bold tracking-wide">
+                  {action.label}
+                </span>
+
+                {/* Luz inferior del color del botón */}
+                <div
+                  className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 rounded-t-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${action.color.replace(
+                    "text-",
+                    "bg-"
+                  )}`}
+                ></div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Subcomponente para las tarjetas pequeñas de arriba
 function KpiCard({ title, value, icon: Icon, color, bg, trend }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">

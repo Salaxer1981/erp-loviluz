@@ -5,6 +5,8 @@ import InvoicesList from "./components/InvoicesList";
 import LoginPage from "./components/LoginPage";
 import EnergyUploader from "./components/EnergyUploader";
 import DashboardHome from "./components/DashboardHome";
+import AiAssistant from "./components/AiAssistant";
+import GovernanceList from "./components/GovernanceList";
 
 function App() {
   // 1. ESTADO DE SEGURIDAD
@@ -12,9 +14,7 @@ function App() {
     !!localStorage.getItem("token")
   );
 
-  // Variable corregida: Ahora la usaremos abajo en el Layout
   const userEmail = localStorage.getItem("userEmail") || "Usuario";
-
   const [activeModule, setActiveModule] = useState("Dashboard");
 
   // Estado para los datos
@@ -27,7 +27,6 @@ function App() {
     nuevos_hoy: 0,
   });
 
-  // Variables corregidas: Ahora las pasaremos al DashboardHome
   const [backendStatus, setBackendStatus] = useState("Desconectado 🔴");
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +34,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("userRole");
     setIsAuthenticated(false);
     setActiveModule("Dashboard");
   };
@@ -45,18 +45,15 @@ function App() {
 
     const loadDashboard = async () => {
       try {
-        // Chequeo de salud
         const resHealth = await fetch("http://127.0.0.1:8000/");
         const dataHealth = await resHealth.json();
         setBackendStatus(dataHealth.estado);
 
-        // Cargar Estadísticas Completas
         const resStats = await fetch("http://127.0.0.1:8000/dashboard-stats/");
         if (resStats.ok) {
           const dataStats = await resStats.json();
           setStats(dataStats);
         }
-
         setLoading(false);
       } catch (error) {
         console.error(error);
@@ -79,16 +76,15 @@ function App() {
       activeModule={activeModule}
       setActiveModule={setActiveModule}
       onLogout={handleLogout}
-      currentUser={userEmail} // <--- FIX 1: Aquí usamos 'userEmail'
+      currentUser={userEmail}
     >
       {/* VISTA DASHBOARD */}
       {activeModule === "Dashboard" && (
         <DashboardHome
           stats={stats}
-          // FIX 2: Pasamos estas variables aunque el componente no las pinte aún,
-          // para que React sepa que las estamos usando y quite el error.
           backendStatus={backendStatus}
           loading={loading}
+          setActiveModule={setActiveModule}
         />
       )}
 
@@ -98,6 +94,11 @@ function App() {
       {activeModule === "Facturación" && <InvoicesList />}
 
       {activeModule === "Energía" && <EnergyUploader />}
+
+      {/* --- CORRECCIÓN: AHORA ESTÁ DENTRO DEL LAYOUT --- */}
+      {activeModule === "Asistente" && <AiAssistant />}
+
+      {activeModule === "Gobernanza" && <GovernanceList />}
     </DashboardLayout>
   );
 }
