@@ -1,24 +1,49 @@
-# Logs
+# --- LOGS Y SISTEMA ---
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+.DS_Store
 
+# --- FRONTEND (REACT) ---
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# --- EDITORES ---
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# ===========================================
+# 🛡️ ZONA DE SEGURIDAD BACKEND (PYTHON)
+# ===========================================
+
+# 1. Entorno Virtual (No subir, pesa mucho)
+backend/venv/
+venv/
+
+# 2. Archivos compilados de Python
+backend/__pycache__/
+__pycache__/
+*.pyc
+
+# 3. Bases de Datos Locales
+backend/*.db
+backend/*.sqlite3
+
+# 4. CLAVES SECRETAS (¡CRÍTICO!)
+backend/.env
+.env
+
+# 5. DATOS SENSIBLES (Tus clientes reales)
+backend/*.xlsx
+backend/*.csv
+backend/cartera.xlsx

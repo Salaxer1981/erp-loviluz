@@ -11,6 +11,8 @@ import {
   MapPin,
   ArrowRight,
   CheckCircle,
+  Edit,
+  Zap,
 } from "lucide-react";
 
 // Componente Helper para Inputs
@@ -40,28 +42,23 @@ export default function ClientsList() {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- ESTADOS DEL WIZARD ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Datos del Formulario Unificado
   const [formData, setFormData] = useState({
-    // Paso 1: Cliente
     nombre: "",
     nif_cif: "",
     persona_contacto: "",
     email: "",
     telefono: "",
     iban: "",
-    // Paso 2: Punto Suministro (CUPS)
     cups: "",
     direccion: "",
     codigo_postal: "",
     provincia: "",
     tarifa_acceso: "2.0TD",
     distribuidora: "",
-    // Paso 3: Contrato
     comercializadora: "",
     producto: "",
     fecha_inicio: "",
@@ -98,7 +95,7 @@ export default function ClientsList() {
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // 1. Crear Cliente
+      // 1. Cliente
       const resCliente = await fetch("http://127.0.0.1:8000/clientes/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,7 +112,7 @@ export default function ClientsList() {
       if (!resCliente.ok) throw new Error("Error creando Cliente");
       const clienteCreado = await resCliente.json();
 
-      // 2. Crear CUPS
+      // 2. CUPS
       const resCups = await fetch("http://127.0.0.1:8000/puntos-suministro/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,7 +129,7 @@ export default function ClientsList() {
       if (!resCups.ok) throw new Error("Error creando CUPS");
       const cupsCreado = await resCups.json();
 
-      // 3. Crear Contrato
+      // 3. Contrato
       const resContrato = await fetch("http://127.0.0.1:8000/contratos/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,24 +153,11 @@ export default function ClientsList() {
         alert("✅ Alta completada con éxito");
         setIsModalOpen(false);
         setCurrentStep(1);
-        // Limpiar formulario
         setFormData({
           nombre: "",
           nif_cif: "",
-          persona_contacto: "",
           email: "",
-          telefono: "",
-          iban: "",
           cups: "",
-          direccion: "",
-          codigo_postal: "",
-          provincia: "",
-          tarifa_acceso: "2.0TD",
-          distribuidora: "",
-          comercializadora: "",
-          producto: "",
-          fecha_inicio: "",
-          fecha_fin: "",
           p1: 0,
           p2: 0,
           p3: 0,
@@ -267,7 +251,6 @@ export default function ClientsList() {
         </table>
       </div>
 
-      {/* --- WIZARD MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex justify-center items-center z-50 p-4">
           <div className="bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
@@ -340,21 +323,21 @@ export default function ClientsList() {
                     Datos del Suministro
                   </h4>
                   <Input
-                    label="Código CUPS (20/22 caracteres)"
+                    label="Código CUPS"
                     name="cups"
                     val={formData.cups}
                     onChange={handleChange}
                     className="font-mono text-lg"
                   />
                   <Input
-                    label="Dirección Suministro"
+                    label="Dirección"
                     name="direccion"
                     val={formData.direccion}
                     onChange={handleChange}
                   />
                   <div className="grid grid-cols-3 gap-4">
                     <Input
-                      label="Código Postal"
+                      label="C. Postal"
                       name="codigo_postal"
                       val={formData.codigo_postal}
                       onChange={handleChange}
@@ -367,7 +350,7 @@ export default function ClientsList() {
                     />
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
-                        Tarifa Acceso
+                        Tarifa
                       </label>
                       <select
                         name="tarifa_acceso"
@@ -387,7 +370,7 @@ export default function ClientsList() {
               {currentStep === 3 && (
                 <div className="space-y-4 animate-in slide-in-from-right duration-300">
                   <h4 className="text-green-400 font-bold uppercase text-xs tracking-wider mb-4">
-                    Condiciones del Contrato
+                    Condiciones
                   </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <Input
@@ -397,7 +380,7 @@ export default function ClientsList() {
                       onChange={handleChange}
                     />
                     <Input
-                      label="Producto / Plan"
+                      label="Producto"
                       name="producto"
                       val={formData.producto}
                       onChange={handleChange}
@@ -419,7 +402,7 @@ export default function ClientsList() {
                   </div>
 
                   <h5 className="text-xs font-bold text-slate-500 mt-4 mb-2">
-                    Potencias Contratadas (kW)
+                    Potencias (kW)
                   </h5>
                   <div className="grid grid-cols-6 gap-2">
                     {[1, 2, 3, 4, 5, 6].map((p) => (

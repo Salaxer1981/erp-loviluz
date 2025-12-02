@@ -95,10 +95,10 @@ function App() {
 
       {activeModule === "Energía" && <EnergyUploader />}
 
-      {/* --- CORRECCIÓN: AHORA ESTÁ DENTRO DEL LAYOUT --- */}
-      {activeModule === "Asistente" && <AiAssistant />}
-
       {activeModule === "Gobernanza" && <GovernanceList />}
+
+      {/* --- CORRECCIÓN: PÉGALO AQUÍ, ANTES DEL CIERRE --- */}
+      {activeModule === "Asistente" && <AiAssistant />}
     </DashboardLayout>
   );
 }
