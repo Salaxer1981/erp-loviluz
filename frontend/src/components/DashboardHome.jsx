@@ -20,6 +20,8 @@ import {
   Users,
   Sparkles,
   Shield,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 
 const dataBarras = [
@@ -71,6 +73,16 @@ export default function DashboardHome({ stats, setActiveModule }) {
       roles: ["admin", "comercial", "backoffice"],
     },
     {
+      label: "Renovaciones",
+      module: "Renovaciones",
+      icon: Timer,
+      color: "text-orange-400",
+      bg: "group-hover:bg-orange-500/20",
+      border: "group-hover:border-orange-500/50",
+      roles: ["admin", "comercial", "backoffice"],
+      badge: stats.por_vencer || 0,
+    },
+    {
       label: "Facturas",
       module: "Facturación",
       icon: FileText,
@@ -106,7 +118,7 @@ export default function DashboardHome({ stats, setActiveModule }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* 1. KPIs (CON ROJO EN FACTURAS) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <KpiCard
           title="Ingresos Totales"
           value={`${stats.total_dinero} €`}
@@ -137,6 +149,16 @@ export default function DashboardHome({ stats, setActiveModule }) {
           icon={FileText}
           color="text-red-600"
           bg="bg-red-50"
+        />
+        <KpiCard
+          title="⚠️ Renovaciones"
+          value={stats.por_vencer || 0}
+          icon={Timer}
+          color="text-orange-600"
+          bg="bg-orange-50"
+          trend="Próximos 45 días"
+          onClick={() => setActiveModule("Renovaciones")}
+          clickable={true}
         />
       </div>
 
@@ -303,6 +325,13 @@ export default function DashboardHome({ stats, setActiveModule }) {
                     ${action.border}
                   `}
               >
+                {/* Badge de contador si existe */}
+                {action.badge && action.badge > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse border-2 border-slate-950">
+                    {action.badge}
+                  </div>
+                )}
+
                 <div
                   className={`p-2 rounded-full mb-2 bg-slate-900/50 ${action.color} group-hover:scale-110 transition-transform`}
                 >
@@ -328,9 +357,25 @@ export default function DashboardHome({ stats, setActiveModule }) {
   );
 }
 
-function KpiCard({ title, value, icon: Icon, color, bg, trend }) {
+function KpiCard({
+  title,
+  value,
+  icon: Icon,
+  color,
+  bg,
+  trend,
+  onClick,
+  clickable,
+}) {
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+    <div
+      className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all ${
+        clickable
+          ? "cursor-pointer hover:scale-105 hover:border-orange-300"
+          : ""
+      }`}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start">
         <div>
           <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
@@ -338,7 +383,13 @@ function KpiCard({ title, value, icon: Icon, color, bg, trend }) {
           </p>
           <h4 className="text-2xl font-bold text-slate-900 mt-1">{value}</h4>
           {trend && (
-            <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded mt-2 inline-block">
+            <span
+              className={`text-xs font-medium px-1.5 py-0.5 rounded mt-2 inline-block ${
+                clickable
+                  ? "text-orange-600 bg-orange-50"
+                  : "text-green-600 bg-green-50"
+              }`}
+            >
               {trend}
             </span>
           )}

@@ -7,6 +7,10 @@ import EnergyUploader from "./components/EnergyUploader";
 import DashboardHome from "./components/DashboardHome";
 import AiAssistant from "./components/AiAssistant";
 import GovernanceList from "./components/GovernanceList";
+import RenewalsList from "./components/RenewalsList";
+import AtrOperations from "./components/AtrOperations";
+import SupportDesk from "./components/SupportDesk";
+import api from "./api/api";
 
 function App() {
   // 1. ESTADO DE SEGURIDAD
@@ -45,14 +49,12 @@ function App() {
 
     const loadDashboard = async () => {
       try {
-        const resHealth = await fetch("http://127.0.0.1:8000/");
-        const dataHealth = await resHealth.json();
-        setBackendStatus(dataHealth.estado);
+        const resHealth = await api.get("/");
+        setBackendStatus(resHealth.data.estado);
 
-        const resStats = await fetch("http://127.0.0.1:8000/dashboard-stats/");
-        if (resStats.ok) {
-          const dataStats = await resStats.json();
-          setStats(dataStats);
+        const resStats = await api.get("/dashboard-stats/");
+        if (resStats.status === 200) {
+          setStats(resStats.data);
         }
         setLoading(false);
       } catch (error) {
@@ -97,8 +99,14 @@ function App() {
 
       {activeModule === "Gobernanza" && <GovernanceList />}
 
+      {activeModule === "Renovaciones" && <RenewalsList />}
+
       {/* --- CORRECCIÓN: PÉGALO AQUÍ, ANTES DEL CIERRE --- */}
       {activeModule === "Asistente" && <AiAssistant />}
+
+      {activeModule === "Operaciones" && <AtrOperations />}
+
+      {activeModule === "Soporte" && <SupportDesk />}
     </DashboardLayout>
   );
 }

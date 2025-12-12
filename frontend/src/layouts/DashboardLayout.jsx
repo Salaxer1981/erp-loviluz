@@ -8,6 +8,9 @@ import {
   LogOut,
   Sparkles,
   Shield,
+  Timer,
+  Activity,
+  LifeBuoy,
 } from "lucide-react";
 
 // --- COMPONENTE DE BOTÓN MEJORADO ---
@@ -26,11 +29,14 @@ const SidebarItem = (props) => {
     blue: "bg-blue-500/10 text-blue-400 border-l-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.15)]",
     yellow:
       "bg-yellow-500/10 text-yellow-400 border-l-4 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.15)]",
+    orange:
+      "bg-orange-500/10 text-orange-400 border-l-4 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.15)]",
     purple:
       "bg-purple-500/10 text-purple-400 border-l-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.15)]",
     pink: "bg-pink-500/10 text-pink-400 border-l-4 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.15)]",
     green:
       "bg-green-500/10 text-green-400 border-l-4 border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.15)]",
+    cyan: "bg-cyan-500/10 text-cyan-400 border-l-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]",
     slate: "bg-slate-700 text-white border-l-4 border-slate-500", // Default dashboard
   };
 
@@ -76,9 +82,18 @@ export default function DashboardLayout({
   const canView = (module) => {
     if (userRole === "admin") return true;
     const permissions = {
-      comercial: ["Dashboard", "CRM", "Energía", "Asistente"],
+      comercial: ["Dashboard", "CRM", "Energía", "Renovaciones", "Asistente"],
       contabilidad: ["Dashboard", "Facturación"],
-      backoffice: ["Dashboard", "CRM", "Energía", "Facturación", "Asistente"],
+      backoffice: [
+        "Dashboard",
+        "CRM",
+        "Energía",
+        "Renovaciones",
+        "Facturación",
+        "Operaciones",
+        "Soporte",
+        "Asistente",
+      ],
     };
     return permissions[userRole]?.includes(module);
   };
@@ -135,6 +150,36 @@ export default function DashboardLayout({
               active={activeModule === "Energía"}
               onClick={() => setActiveModule("Energía")}
               glowColor="yellow"
+            />
+          )}
+
+          {canView("Renovaciones") && (
+            <SidebarItem
+              Icon={Timer}
+              label="Renovaciones"
+              active={activeModule === "Renovaciones"}
+              onClick={() => setActiveModule("Renovaciones")}
+              glowColor="orange"
+            />
+          )}
+
+          {canView("Operaciones") && (
+            <SidebarItem
+              Icon={Activity}
+              label="Operaciones ATR"
+              active={activeModule === "Operaciones"}
+              onClick={() => setActiveModule("Operaciones")}
+              glowColor="cyan"
+            />
+          )}
+
+          {canView("Soporte") && (
+            <SidebarItem
+              Icon={LifeBuoy}
+              label="Soporte"
+              active={activeModule === "Soporte"}
+              onClick={() => setActiveModule("Soporte")}
+              glowColor="orange"
             />
           )}
 

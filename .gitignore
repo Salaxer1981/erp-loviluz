@@ -4,11 +4,19 @@
 # --- Python (Backend) ---
 backend/venv/
 backend/__pycache__/
+# La base de datos local y sus archivos
+backend/crm_database.db
 backend/*.db
 backend/*.sqlite3
 *.pyc
+# Ficheros de logs
+*.log
 
 # --- Node (Frontend) ---
 frontend/node_modules/
 frontend/dist/
+
+# --- Claves Secretas (CRÍTICO) ---
+# Archivos con las claves de API reales y secretos
+backend/.env
 frontend/.env

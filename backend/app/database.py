@@ -1,22 +1,30 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# 1. La URL de la base de datos (Ahora usamos SQLite local)
-# Si fuera Postgres sería: "postgresql://usuario:pass@localhost/db"
-SQLALCHEMY_DATABASE_URL = "sqlite:///./crm_database.db"
+# 1. BUSCAR URL DE LA NUBE O USAR LOCAL
+# Si existe la variable 'DATABASE_URL' (en la nube), la usa.
+# Si no, usa 'sqlite:///./crm_database.db' (en tu PC).
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./crm_database.db")
 
-# 2. Creamos el motor (El "cerebro" de la DB)
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# 2. CORRECCIÓN PARA RENDER
+# Render a veces da la URL empezando por "postgres://", pero SQLAlchemy necesita "postgresql://"
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# 3. Creamos la sesión (Para poder guardar/leer datos)
+# 3. CREAR EL MOTOR (DETECTANDO SI ES SQLITE O POSTGRES)
+if "sqlite" in SQLALCHEMY_DATABASE_URL:
+    # Configuración específica para SQLite (local)
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+else:
+    # Configuración para PostgreSQL (nube)
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 4. La clase base para nuestros modelos (Tablas)
 Base = declarative_base()
 
-# 5. Dependencia para obtener la DB en cada petición
 def get_db():
     db = SessionLocal()
     try:

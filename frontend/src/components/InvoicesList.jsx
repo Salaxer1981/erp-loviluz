@@ -8,6 +8,7 @@ import {
   Square,
   Plus,
 } from "lucide-react";
+import api from "../api/api";
 
 export default function InvoicesList() {
   const [facturas, setFacturas] = useState([]);
@@ -26,11 +27,11 @@ export default function InvoicesList() {
     const loadData = async () => {
       try {
         const [resFacturas, resClientes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/facturas/"),
-          fetch("http://127.0.0.1:8000/clientes/"),
+          api.get("/facturas/"),
+          api.get("/clientes/"),
         ]);
-        setFacturas(await resFacturas.json());
-        setClientes(await resClientes.json());
+        setFacturas(resFacturas.data);
+        setClientes(resClientes.data);
         setLoading(false);
       } catch (err) {
         console.error(err);
@@ -50,16 +51,11 @@ export default function InvoicesList() {
     if (selectedIds.length === 0)
       return alert("Selecciona al menos una factura");
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/facturas/generar-remesa",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(selectedIds),
-        }
-      );
-      if (response.ok) {
-        const blob = await response.blob();
+      const response = await api.post("/facturas/generar-remesa", selectedIds, {
+        responseType: "blob",
+      });
+      if (response.status === 200) {
+        const blob = response.data;
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -72,7 +68,7 @@ export default function InvoicesList() {
       } else {
         alert("Error generando SEPA.");
       }
-    } catch (error) {
+    } catch {
       alert("Error de conexión");
     }
   };
@@ -84,12 +80,8 @@ export default function InvoicesList() {
         ...formData,
         cliente_id: parseInt(formData.cliente_id),
       };
-      const res = await fetch("http://127.0.0.1:8000/facturas/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
+      const res = await api.post("/facturas/", payload);
+      if (res.status === 200 || res.status === 201) {
         setIsModalOpen(false);
         setReloadKey((p) => p + 1);
       }

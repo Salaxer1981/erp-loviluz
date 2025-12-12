@@ -13,7 +13,10 @@ import {
   CheckCircle,
   Edit,
   Zap,
+  UploadCloud,
+  File as FileIcon,
 } from "lucide-react";
+import api from "../api/api";
 
 // Componente Helper para Inputs
 const Input = ({
@@ -23,6 +26,7 @@ const Input = ({
   onChange,
   type = "text",
   className = "",
+  error = "",
 }) => (
   <div className={className}>
     <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">
@@ -33,8 +37,11 @@ const Input = ({
       name={name}
       value={val}
       onChange={onChange}
-      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+      className={`w-full bg-slate-950 border ${
+        error ? "border-red-500" : "border-slate-800"
+      } rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all`}
     />
+    {error && <p className="text-red-400 text-[10px] mt-1">{error}</p>}
   </div>
 );
 
@@ -42,9 +49,14 @@ export default function ClientsList() {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Wizard States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(""); // Para mostrar qué está haciendo
+
+  // Archivos
+  const [files, setFiles] = useState({ dni: null, factura: null });
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -71,14 +83,16 @@ export default function ClientsList() {
     p6: 0,
   });
 
+  const [errors, setErrors] = useState({});
+
   const fetchClientes = () => {
-    fetch("http://127.0.0.1:8000/clientes/")
-      .then((res) => res.json())
-      .then((data) => {
-        setClientes(data);
+    api
+      .get("/clientes/")
+      .then((res) => {
+        setClientes(res.data);
         setLoading(false);
       })
-      .catch((err) => console.error(err));
+      .catch(console.error);
   };
 
   useEffect(() => {
@@ -87,97 +101,135 @@ export default function ClientsList() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: null });
   };
 
-  const nextStep = () => setCurrentStep((prev) => prev + 1);
+  const validateStep = () => {
+    let newErrors = {};
+    let isValid = true;
+    if (currentStep === 1) {
+      if (!formData.nif_cif) newErrors.nif_cif = "Requerido";
+      if (!formData.nombre) newErrors.nombre = "Requerido";
+    }
+    if (currentStep === 2) {
+      // Validación laxa para pruebas, en prod usar Regex real
+      if (!formData.cups || formData.cups.length < 20) {
+        newErrors.cups = "CUPS inválido (mín 20 chars)";
+        isValid = false;
+      }
+    }
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const nextStep = () => {
+    if (validateStep()) setCurrentStep((prev) => prev + 1);
+  };
   const prevStep = () => setCurrentStep((prev) => prev - 1);
 
+  // --- FUNCIÓN PARA SUBIR ARCHIVO AL BACKEND ---
+  const uploadFileToBackend = async (fileObject, tipo, clienteId) => {
+    // 1. Subir el archivo físico (Endpoint que creamos antes /upload/)
+    const data = new FormData();
+    data.append("file", fileObject);
+
+    const resUpload = await api.post("/upload/", data);
+    const uploadData = resUpload.data;
+
+    // 2. Registrar en base de datos (Tabla Documentos)
+    const docPayload = {
+      tipo: tipo,
+      nombre_archivo: fileObject.name,
+      url_archivo: uploadData.url || "ruta/simulada",
+      cliente_id: clienteId,
+    };
+
+    await api.post("/documentos/", docPayload);
+  };
+
+  // --- PROCESO FINAL DE ALTA ---
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
+
     try {
-      // 1. Cliente
-      const resCliente = await fetch("http://127.0.0.1:8000/clientes/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          nif_cif: formData.nif_cif,
-          persona_contacto: formData.persona_contacto,
-          email: formData.email,
-          telefono: formData.telefono,
-          iban: formData.iban,
-          tipo_cliente: "PYME",
-        }),
+      // 1. CREAR CLIENTE
+      setSubmitStatus("Registrando Cliente...");
+      const resCliente = await api.post("/clientes/", {
+        nombre: formData.nombre,
+        nif_cif: formData.nif_cif,
+        persona_contacto: formData.persona_contacto,
+        email: formData.email,
+        telefono: formData.telefono,
+        iban: formData.iban,
       });
-      if (!resCliente.ok) throw new Error("Error creando Cliente");
-      const clienteCreado = await resCliente.json();
+      if (resCliente.status !== 200 && resCliente.status !== 201)
+        throw new Error("Error creando Cliente (¿NIF duplicado?)");
+      const clienteCreado = resCliente.data;
 
-      // 2. CUPS
-      const resCups = await fetch("http://127.0.0.1:8000/puntos-suministro/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cups: formData.cups,
-          direccion: formData.direccion,
-          codigo_postal: formData.codigo_postal,
-          provincia: formData.provincia,
-          tarifa_acceso: formData.tarifa_acceso,
-          distribuidora: formData.distribuidora,
-          cliente_id: clienteCreado.id,
-        }),
+      // 2. SUBIR DOCUMENTOS (En paralelo)
+      setSubmitStatus("Subiendo Documentos...");
+      if (files.dni)
+        await uploadFileToBackend(files.dni, "DNI", clienteCreado.id);
+      if (files.factura)
+        await uploadFileToBackend(files.factura, "FACTURA", clienteCreado.id);
+
+      // 3. CREAR CUPS
+      setSubmitStatus("Registrando Suministro...");
+      const resCups = await api.post("/puntos-suministro/", {
+        cups: formData.cups,
+        direccion: formData.direccion,
+        codigo_postal: formData.codigo_postal,
+        provincia: formData.provincia,
+        tarifa_acceso: formData.tarifa_acceso,
+        distribuidora: formData.distribuidora,
+        cliente_id: clienteCreado.id,
       });
-      if (!resCups.ok) throw new Error("Error creando CUPS");
-      const cupsCreado = await resCups.json();
+      const cupsCreado = resCups.data;
 
-      // 3. Contrato
-      const resContrato = await fetch("http://127.0.0.1:8000/contratos/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          punto_suministro_id: cupsCreado.id,
-          comercializadora: formData.comercializadora,
-          producto: formData.producto,
-          fecha_inicio: formData.fecha_inicio || null,
-          fecha_fin: formData.fecha_fin || null,
-          p1: parseFloat(formData.p1),
-          p2: parseFloat(formData.p2),
-          p3: parseFloat(formData.p3),
-          p4: parseFloat(formData.p4),
-          p5: parseFloat(formData.p5),
-          p6: parseFloat(formData.p6),
-          estado: "Activo",
-        }),
+      // 4. CREAR CONTRATO
+      setSubmitStatus("Generando Contrato...");
+      const resContrato = await api.post("/contratos/", {
+        punto_suministro_id: cupsCreado.id,
+        comercializadora: formData.comercializadora,
+        producto: formData.producto,
+        fecha_inicio: formData.fecha_inicio || null,
+        fecha_fin: formData.fecha_fin || null,
+        p1: parseFloat(formData.p1),
+        p2: parseFloat(formData.p2),
+        p3: parseFloat(formData.p3),
+        p4: parseFloat(formData.p4),
+        p5: parseFloat(formData.p5),
+        p6: parseFloat(formData.p6),
+        estado: "Borrador",
+      });
+      const contratoCreado = resContrato.data;
+
+      // 5. INICIAR ATR (Switching)
+      setSubmitStatus("Solicitando ATR...");
+      // Usamos el endpoint nuevo de Claude o el que definimos antes
+      await api.post("/procesos-atr/", {
+        tipo: "C1", // Alta
+        codigo_solicitud: `SOL-${Date.now()}`, // Generamos un código temp
+        estado_atr: "01-Solicitado",
+        contrato_id: contratoCreado.id,
       });
 
-      if (resContrato.ok) {
-        alert("✅ Alta completada con éxito");
-        setIsModalOpen(false);
-        setCurrentStep(1);
-        setFormData({
-          nombre: "",
-          nif_cif: "",
-          email: "",
-          cups: "",
-          p1: 0,
-          p2: 0,
-          p3: 0,
-          p4: 0,
-          p5: 0,
-          p6: 0,
-        });
-        fetchClientes();
-      }
+      alert("✅ ALTA EXITOSA: Cliente, Contrato y ATR generados.");
+      setIsModalOpen(false);
+      setCurrentStep(1);
+      fetchClientes();
     } catch (error) {
-      alert("❌ Falló el proceso: " + error.message);
+      alert("❌ Error: " + error.message);
     } finally {
       setIsSubmitting(false);
+      setSubmitStatus("");
     }
   };
 
   if (loading)
     return (
       <div className="p-8 text-slate-400 animate-pulse">
-        Cargando cartera...
+        Cargando sistema...
       </div>
     );
 
@@ -196,61 +248,50 @@ export default function ClientsList() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-[0_0_15px_rgba(37,99,235,0.3)] flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"
         >
           <Plus size={18} /> Nueva Alta
         </button>
       </div>
 
-      <div className="relative z-10 overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-400">
-          <thead className="bg-white/5 text-xs uppercase font-semibold text-slate-500">
-            <tr>
-              <th className="px-6 py-4">Nombre</th>
-              <th className="px-6 py-4">Empresa</th>
-              <th className="px-6 py-4">Datos</th>
-              <th className="px-6 py-4 text-right">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {clientes.map((cliente) => (
-              <tr
-                key={cliente.id}
-                className="hover:bg-white/5 transition-colors group"
-              >
-                <td className="px-6 py-4 font-medium text-slate-200 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-blue-400">
-                    <User size={18} />
-                  </div>
-                  {cliente.nombre}
-                </td>
-                <td className="px-6 py-4 text-slate-300">
-                  {cliente.empresa || "N/A"}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1 text-xs">
-                    <span className="flex items-center gap-1">
-                      <Mail size={10} /> {cliente.email}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone size={10} /> {cliente.telefono}
-                    </span>
-                    <span className="flex items-center gap-1 text-slate-500">
-                      <CreditCard size={10} /> {cliente.iban || "Sin IBAN"}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
-                    ACTIVO
+      {/* LISTA VISUAL */}
+      <div className="relative z-10 p-4 grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+        {clientes.length === 0 && (
+          <div className="text-slate-500 text-center p-10">
+            No hay clientes.
+          </div>
+        )}
+        {clientes.map((c) => (
+          <div
+            key={c.id}
+            className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/30 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-blue-400 font-bold">
+                {c.nombre ? c.nombre.charAt(0) : "?"}
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-200">{c.nombre}</h4>
+                <div className="flex gap-3 text-xs text-slate-500 mt-1">
+                  <span className="flex items-center gap-1">
+                    <FileText size={10} /> {c.nif_cif}
                   </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <span className="flex items-center gap-1">
+                    <MapPin size={10} /> {c.email}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
+                ACTIVO
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
+      {/* --- WIZARD MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex justify-center items-center z-50 p-4">
           <div className="bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
@@ -260,7 +301,14 @@ export default function ClientsList() {
                   Alta de Suministro
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Paso {currentStep} de 3
+                  Paso {currentStep} de 4:{" "}
+                  {currentStep === 1
+                    ? "Titular"
+                    : currentStep === 2
+                    ? "Suministro"
+                    : currentStep === 3
+                    ? "Contrato"
+                    : "Documentación"}
                 </p>
               </div>
               <button onClick={() => setIsModalOpen(false)}>
@@ -271,15 +319,16 @@ export default function ClientsList() {
             <div className="h-1 w-full bg-slate-800">
               <div
                 className="h-full bg-blue-500 transition-all duration-300"
-                style={{ width: `${(currentStep / 3) * 100}%` }}
+                style={{ width: `${(currentStep / 4) * 100}%` }}
               ></div>
             </div>
 
             <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+              {/* PASO 1 */}
               {currentStep === 1 && (
                 <div className="space-y-4 animate-in slide-in-from-right duration-300">
                   <h4 className="text-blue-400 font-bold uppercase text-xs tracking-wider mb-4">
-                    Datos del Titular
+                    1. Datos del Titular
                   </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <Input
@@ -287,12 +336,14 @@ export default function ClientsList() {
                       name="nombre"
                       val={formData.nombre}
                       onChange={handleChange}
+                      error={errors.nombre}
                     />
                     <Input
                       label="NIF / CIF"
                       name="nif_cif"
                       val={formData.nif_cif}
                       onChange={handleChange}
+                      error={errors.nif_cif}
                     />
                     <Input
                       label="Email"
@@ -317,20 +368,22 @@ export default function ClientsList() {
                 </div>
               )}
 
+              {/* PASO 2 */}
               {currentStep === 2 && (
                 <div className="space-y-4 animate-in slide-in-from-right duration-300">
                   <h4 className="text-yellow-400 font-bold uppercase text-xs tracking-wider mb-4">
-                    Datos del Suministro
+                    2. Datos del Suministro
                   </h4>
                   <Input
-                    label="Código CUPS"
+                    label="Código CUPS (ES...)"
                     name="cups"
                     val={formData.cups}
                     onChange={handleChange}
+                    error={errors.cups}
                     className="font-mono text-lg"
                   />
                   <Input
-                    label="Dirección"
+                    label="Dirección Suministro"
                     name="direccion"
                     val={formData.direccion}
                     onChange={handleChange}
@@ -342,35 +395,23 @@ export default function ClientsList() {
                       val={formData.codigo_postal}
                       onChange={handleChange}
                     />
-                    <Input
-                      label="Provincia"
-                      name="provincia"
-                      val={formData.provincia}
-                      onChange={handleChange}
-                    />
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">
-                        Tarifa
-                      </label>
-                      <select
-                        name="tarifa_acceso"
-                        value={formData.tarifa_acceso}
+                    <div className="col-span-2">
+                      <Input
+                        label="Provincia"
+                        name="provincia"
+                        val={formData.provincia}
                         onChange={handleChange}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm focus:border-yellow-500 outline-none"
-                      >
-                        <option>2.0TD</option>
-                        <option>3.0TD</option>
-                        <option>6.1TD</option>
-                      </select>
+                      />
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* PASO 3 */}
               {currentStep === 3 && (
                 <div className="space-y-4 animate-in slide-in-from-right duration-300">
                   <h4 className="text-green-400 font-bold uppercase text-xs tracking-wider mb-4">
-                    Condiciones
+                    3. Condiciones del Contrato
                   </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <Input
@@ -385,22 +426,7 @@ export default function ClientsList() {
                       val={formData.producto}
                       onChange={handleChange}
                     />
-                    <Input
-                      type="date"
-                      label="Fecha Inicio"
-                      name="fecha_inicio"
-                      val={formData.fecha_inicio}
-                      onChange={handleChange}
-                    />
-                    <Input
-                      type="date"
-                      label="Fecha Fin"
-                      name="fecha_fin"
-                      val={formData.fecha_fin}
-                      onChange={handleChange}
-                    />
                   </div>
-
                   <h5 className="text-xs font-bold text-slate-500 mt-4 mb-2">
                     Potencias (kW)
                   </h5>
@@ -423,12 +449,56 @@ export default function ClientsList() {
                   </div>
                 </div>
               )}
+
+              {/* PASO 4 */}
+              {currentStep === 4 && (
+                <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                  <h4 className="text-purple-400 font-bold uppercase text-xs tracking-wider mb-4">
+                    4. Documentación Obligatoria
+                  </h4>
+
+                  <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 hover:bg-white/5 transition-colors text-center cursor-pointer relative group">
+                    <input
+                      type="file"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={(e) =>
+                        setFiles({ ...files, dni: e.target.files[0] })
+                      }
+                    />
+                    <div className="pointer-events-none">
+                      <UploadCloud className="mx-auto text-slate-500 mb-2 group-hover:text-purple-400 transition-colors" />
+                      <p className="text-sm text-slate-300 font-medium">
+                        {files.dni ? files.dni.name : "Subir DNI / CIF"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 hover:bg-white/5 transition-colors text-center cursor-pointer relative group">
+                    <input
+                      type="file"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={(e) =>
+                        setFiles({ ...files, factura: e.target.files[0] })
+                      }
+                    />
+                    <div className="pointer-events-none">
+                      <FileIcon className="mx-auto text-slate-500 mb-2 group-hover:text-purple-400 transition-colors" />
+                      <p className="text-sm text-slate-300 font-medium">
+                        {files.factura
+                          ? files.factura.name
+                          : "Subir Factura Anterior"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="p-6 border-t border-slate-800 flex justify-between">
+            <div className="p-6 border-t border-slate-800 flex justify-between items-center">
               {currentStep > 1 ? (
                 <button
                   onClick={prevStep}
+                  disabled={isSubmitting}
                   className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 hover:bg-white/5 font-bold"
                 >
                   Atrás
@@ -437,7 +507,7 @@ export default function ClientsList() {
                 <div></div>
               )}
 
-              {currentStep < 3 ? (
+              {currentStep < 4 ? (
                 <button
                   onClick={nextStep}
                   className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-500 font-bold flex items-center gap-2"
@@ -448,10 +518,18 @@ export default function ClientsList() {
                 <button
                   onClick={handleFinalSubmit}
                   disabled={isSubmitting}
-                  className="px-8 py-3 rounded-xl bg-green-600 text-white hover:bg-green-500 font-bold flex items-center gap-2 shadow-lg shadow-green-900/20"
+                  className="px-8 py-3 rounded-xl bg-green-600 text-white hover:bg-green-500 font-bold flex items-center gap-2 shadow-lg shadow-green-900/20 disabled:opacity-50 disabled:cursor-wait"
                 >
-                  {isSubmitting ? "Guardando..." : "Finalizar Alta"}{" "}
-                  <CheckCircle size={16} />
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      {submitStatus || "Procesando..."}
+                    </span>
+                  ) : (
+                    <>
+                      Firmar y Activar <CheckCircle size={16} />
+                    </>
+                  )}
                 </button>
               )}
             </div>

@@ -117,3 +117,75 @@ class TarifaResponse(TarifaBase):
     id: int
     class Config:
         from_attributes = True
+
+# =======================
+# 6. ESQUEMAS DE DOCUMENTO
+# =======================
+class DocumentoBase(BaseModel):
+    tipo: str # DNI, FACTURA, CIE
+    nombre_archivo: str
+    url_archivo: str
+    cliente_id: int
+
+class DocumentoCreate(DocumentoBase):
+    pass
+
+class DocumentoResponse(DocumentoBase):
+    id: int
+    uploaded_at: datetime
+    class Config:
+        from_attributes = True
+
+# =======================
+# 7. ESQUEMAS DE PROCESO ATR (Switching)
+# =======================
+class ProcesoATRBase(BaseModel):
+    tipo: str = "C1" # C1: Alta, C2: Cambio Titular
+    codigo_solicitud: str
+    estado_atr: str = "01-Solicitado"
+    motivo_rechazo: Optional[str] = None
+    contrato_id: int
+
+class ProcesoATRCreate(ProcesoATRBase):
+    pass
+
+class ProcesoATRUpdate(BaseModel):
+    estado_atr: Optional[str] = None
+    motivo_rechazo: Optional[str] = None
+
+class ProcesoATRResponse(ProcesoATRBase):
+    id: int
+    fecha_solicitud: datetime
+    class Config:
+        from_attributes = True
+
+# =======================
+# 8. ESQUEMAS DE SOPORTE
+# =======================
+class TicketBase(BaseModel):
+    asunto: str
+    descripcion: str
+    prioridad: str = "Media"
+    cliente_id: int
+
+class TicketCreate(TicketBase):
+    pass
+
+class TicketResponse(TicketBase):
+    id: int
+    estado: str
+    fecha_creacion: datetime
+    class Config:
+        from_attributes = True
+
+class MensajeCreate(BaseModel):
+    texto: str
+    es_interno: bool = False
+    autor: str = "Soporte"
+    ticket_id: int
+
+class MensajeResponse(MensajeCreate):
+    id: int
+    fecha: datetime
+    class Config:
+        from_attributes = True

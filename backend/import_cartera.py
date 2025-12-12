@@ -46,13 +46,22 @@ def importar_cartera():
             return
 
         contador = 0
+        clientes_nuevos = 0
+        clientes_existentes = 0
+        puntos_nuevos = 0
+        puntos_existentes = 0
+        contratos_duplicados = 0
+        sin_nif = 0
+        sin_cups = 0
         
         for index, row in df.iterrows():
             try:
                 # --- 1. CLIENTE ---
                 nif = str(row.get("CIF/NIF", "")).strip()
                 # Si no hay NIF válido, saltamos la fila
-                if not nif or nif.lower() == "nan": continue
+                if not nif or nif.lower() == "nan" or nif == "":
+                    sin_nif += 1
+                    continue
                 
                 # Buscamos si ya existe para no duplicar
                 cliente = db.query(models.Cliente).filter(models.Cliente.nif_cif == nif).first()
@@ -70,12 +79,16 @@ def importar_cartera():
                     db.add(cliente)
                     db.commit()
                     db.refresh(cliente)
+                    clientes_nuevos += 1
+                else:
+                    clientes_existentes += 1
 
                 # --- 2. PUNTO DE SUMINISTRO (CUPS) ---
                 cups_codigo = str(row.get("CUPS", "")).strip()
                 
                 # Validación básica de CUPS
-                if not cups_codigo or len(cups_codigo) < 10 or cups_codigo.lower() == "nan":
+                if not cups_codigo or len(cups_codigo) < 10 or cups_codigo.lower() == "nan" or cups_codigo == "":
+                    sin_cups += 1
                     continue
 
                 punto = db.query(models.PuntoSuministro).filter(models.PuntoSuministro.cups == cups_codigo).first()
@@ -92,6 +105,9 @@ def importar_cartera():
                     db.add(punto)
                     db.commit()
                     db.refresh(punto)
+                    puntos_nuevos += 1
+                else:
+                    puntos_existentes += 1
 
                 # --- 3. CONTRATO ---
                 if punto:
@@ -124,13 +140,28 @@ def importar_cartera():
                         
                         if contador % 50 == 0: 
                             print(f"⏳ Procesados {contador} contratos...")
+                    else:
+                        contratos_duplicados += 1
 
             except Exception as e:
                 # Si falla una fila, la mostramos pero seguimos con la siguiente
                 # print(f"⚠️ Fila {index} ignorada: {e}")
                 continue
 
-        print(f"✅ ¡FIN! Se han importado {contador} contratos a la base de datos.")
+        print(f"\n{'='*80}")
+        print(f"✅ ¡IMPORTACIÓN FINALIZADA!")
+        print(f"{'='*80}")
+        print(f"📊 RESUMEN:")
+        print(f"   • Contratos nuevos importados: {contador}")
+        print(f"   • Clientes nuevos: {clientes_nuevos}")
+        print(f"   • Clientes ya existentes: {clientes_existentes}")
+        print(f"   • Puntos de suministro nuevos: {puntos_nuevos}")
+        print(f"   • Puntos de suministro ya existentes: {puntos_existentes}")
+        print(f"   • Contratos duplicados (ya existían): {contratos_duplicados}")
+        print(f"\n⚠️  FILAS IGNORADAS:")
+        print(f"   • Sin NIF/CIF válido: {sin_nif}")
+        print(f"   • Sin CUPS válido: {sin_cups}")
+        print(f"{'='*80}")
 
     except Exception as e:
         print(f"❌ Error crítico leyendo Excel: {e}")
